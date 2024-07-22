@@ -1,0 +1,279 @@
+from flask import Flask, request, jsonify, render_template
+from flask_socketio import SocketIO, emit
+from threading import Thread, Event
+from datetime import datetime, timedelta
+import time
+import RPi.GPIO as GPIO
+
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+schedules = {1: [], 2: [], 3: [], 4: []}
+
+# Global variables for motor and flow sensor data
+FLOW_SENSOR_DATA = {
+    "flowRate1": 0.0,
+    "flowRate2": 0.0,
+    "flowRate3": 0.0,
+    "flowRate4": 0.0,
+}
+
+# GPIO setup
+MOTOR_PINS = [2, 3, 4, 5]
+FLOW_SENSOR_PINS = [6, 7, 8, 9]
+GPIO.setmode(GPIO.BCM)
+for pin in MOTOR_PINS:
+    GPIO.setup(pin, GPIO.OUT)
+for pin in FLOW_SENSOR_PINS:
+    GPIO.setup(pin, GPIO.IN)
+
+motor_status = {
+    "status1": "OFF",
+    "status2": "OFF",
+    "status3": "OFF",
+    "status4": "OFF",
+}
+
+schedules = []  # List to hold multiple schedules
+scheduler_enabled = False
+
+stop_event = Event()
+esp_connected = True  # Assume ESP32 is initially connected
+
+history_log = []
+
+manual_control = [False, False, False, False]  # Track manual control for each motor
+
+def read_sensors():
+    global esp_connected, FLOW_SENSOR_DATA
+    while not stop_event.is_set():
+        if esp_connected:
+            for i, pin in enumerate(FLOW_SENSOR_PINS):
+                # Read the sensor data and update FLOW_SENSOR_DATA
+                flow_rate = GPIO.input(pin)  # Replace with actual reading logic
+                FLOW_SENSOR_DATA[f"flowRate{i+1}"] = flow_rate
+            print("Reading sensor data...", FLOW_SENSOR_DATA)
+            print("Motor Status:", motor_status)
+            time.sleep(5)
+        else:
+            print("ESP32 not connected. Waiting for connection...")
+            time.sleep(1)
+
+sensor_thread = Thread(target=read_sensors)
+sensor_thread.start()
+
+def send_water(motor_index, amount):
+    print(f"Sending {amount} units of water from motor {motor_index + 1}...")
+    # Code to send water goes here
+    time.sleep(3)  # Simulating water sending process
+    print("Water sent successfully.")
+    return True
+
+def is_within_schedule(current_time, motor_index):
+    global schedules
+    current_weekday = datetime.now().strftime("%A")
+    for schedule in schedules:
+        if current_weekday in schedule["days"] and schedule["start"] <= current_time < schedule["end"] and schedule["motor"] == motor_index:
+            return True
+    return False
+
+def schedule_motor():
+    global scheduler_enabled, manual_control
+
+    while not stop_event.is_set():
+        current_time = datetime.now().strftime("%H:%M")
+
+        for i in range(4):
+            if scheduler_enabled and is_within_schedule(current_time, i) and not manual_control[i]:
+                if motor_status[f"status{i+1}"] == "OFF":
+                    GPIO.output(MOTOR_PINS[i], GPIO.HIGH)
+                    motor_status[f"status{i+1}"] = "ON"
+                    log_entry = f"Motor {i+1} turned ON at {current_time} (Scheduled)"
+                    history_log.append(log_entry)
+                    print(log_entry)
+                    if send_water(i, water_amount):
+                        # The motor should remain on until the end of the scheduled time slot
+                        continue
+                elif motor_status[f"status{i+1}"] == "ON" and not is_within_schedule(current_time, i):
+                    GPIO.output(MOTOR_PINS[i], GPIO.LOW)
+                    motor_status[f"status{i+1}"] = "OFF"
+                    log_entry = f"Motor {i+1} turned OFF at {current_time} (Scheduled)"
+                    history_log.append(log_entry)
+                    print(log_entry)
+            elif not manual_control[i] and motor_status[f"status{i+1}"] == "ON" and not is_within_schedule(current_time, i):
+                GPIO.output(MOTOR_PINS[i], GPIO.LOW)
+                motor_status[f"status{i+1}"] = "OFF"
+                log_entry = f"Motor {i+1} turned OFF at {current_time} (Scheduled)"
+                history_log.append(log_entry)
+                print(log_entry)
+
+        time.sleep(1)
+
+scheduler_thread = Thread(target=schedule_motor)
+scheduler_thread.start()
+
+@socketio.on('connect')
+def handle_connect():
+    emit('server_status', {'status': 'connected'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    emit('server_status', {'status': 'disconnected'})
+
+def emit_motor_status_updates():
+    while not stop_event.is_set():
+        for motor_index in range(1, 5):
+            status = motor_status[f"status{motor_index}"]
+            socketio.emit('motor_status_update', {'motor_index': motor_index, 'status': status}, broadcast=True)
+        time.sleep(1)  # Adjust interval based on your update frequency
+
+emit_thread = Thread(target=emit_motor_status_updates)
+emit_thread.start()
+
+@app.route('/')
+def index():
+    return render_template('index2.html', motorStatus=motor_status, schedules=schedules)
+
+@app.route('/update_flow', methods=['POST'])
+def update_flow():
+    global FLOW_SENSOR_DATA
+    data = request.get_json()
+    FLOW_SENSOR_DATA["flowRate1"] = data.get("flowRate1", 0.0)
+    FLOW_SENSOR_DATA["flowRate2"] = data.get("flowRate2", 0.0)
+    FLOW_SENSOR_DATA["flowRate3"] = data.get("flowRate3", 0.0)
+    FLOW_SENSOR_DATA["flowRate4"] = data.get("flowRate4", 0.0)
+    return jsonify({"status": "Flow rate updated", "flowRate": FLOW_SENSOR_DATA})
+
+@app.route('/flow_rate/<int:channel_id>', methods=['GET'])
+def get_flow_rate(channel_id):
+    global FLOW_SENSOR_DATA
+    flow_rate = FLOW_SENSOR_DATA.get(f"flowRate{channel_id}", 0.0)
+    return jsonify({"flow_rate": flow_rate})
+
+@app.route('/add_schedule')
+def add_schedule():
+    global schedules, scheduler_enabled, water_amount
+    try:
+        start_time = request.args.get('start')
+        water_amount = int(request.args.get('waterAmount'))
+        days = request.args.get('days').split(',')
+        motor_index = int(request.args.get('channel')) - 1
+
+        if not start_time or not days or motor_index < 0:
+            return jsonify({"message": "Invalid parameters"}), 400
+
+        flow_rate = FLOW_SENSOR_DATA[f"flowRate{motor_index + 1}"]
+        duration = calculate_duration(water_amount, flow_rate)
+        end_time = calculate_end_time(start_time, duration)
+
+        new_schedule = {
+            "start": start_time,
+            "end": end_time,
+            "days": days,
+            "motor": motor_index,
+            "waterAmount": water_amount
+        }
+
+        schedules.append(new_schedule)
+        scheduler_enabled = True
+
+        log_entry = f"Schedule added: {start_time} - {end_time} on {days} for motor {motor_index + 1}, Water Amount: {water_amount} liters"
+        history_log.append(log_entry)
+        print(log_entry)
+
+        return jsonify({"message": "Schedule added successfully."})
+    except ValueError as e:
+        return jsonify({"message": f"Invalid input: {e}"}), 400
+    except Exception as e:
+        return jsonify({"message": f"An error occurred: {e}"}), 500
+
+def calculate_duration(water_amount, flow_rate):
+    if flow_rate <= 0:
+        raise ValueError("Flow rate must be greater than zero")
+    return water_amount / flow_rate  # Duration in minutes
+
+def calculate_end_time(start_time, duration):
+    start_datetime = datetime.strptime(start_time, "%H:%M")
+    end_datetime = start_datetime + timedelta(minutes=duration)
+    return end_datetime.strftime("%H:%M")
+
+@app.route('/remove_schedule')
+def remove_schedule():
+    global schedules
+    try:
+        start_time = request.args.get('start')
+        end_time = request.args.get('end')
+        motor_index = int(request.args.get('channel')) - 1
+
+        if not start_time or not end_time or motor_index < 0:
+            return jsonify({"message": "Invalid parameters"}), 400
+
+        # Removing schedule
+        schedules = [s for s in schedules if not (s["start"] == start_time and s["end"] == end_time and s["motor"] == motor_index)]
+        
+        log_entry = f"Schedule removed: {start_time} - {end_time} for motor {motor_index + 1}"
+        history_log.append(log_entry)
+        print(log_entry)
+
+        return jsonify({"message": "Schedule removed successfully."})
+    except ValueError as e:
+        return jsonify({"message": f"Invalid input: {e}"}), 400
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return jsonify({"message": f"An error occurred: {e}"}), 500
+
+@app.route('/get_schedules', methods=['GET'])
+def get_schedules():
+    return jsonify({"schedules": schedules})
+
+@app.route('/motor/<int:motor_index>/<action>', methods=['GET'])
+def control_motor(motor_index, action):
+    global esp_connected, manual_control
+    motor_index -= 1  # Adjust for zero-based indexing
+    if motor_index < 0 or motor_index >= len(MOTOR_PINS):
+        return jsonify({"error": "Invalid motor index"}), 400
+
+    if not esp_connected:
+        return jsonify({"error": "ESP32 not connected."}), 400
+
+    current_time = datetime.now().strftime('%H:%M')
+
+    if action == "on":
+        GPIO.output(MOTOR_PINS[motor_index], GPIO.HIGH)
+        motor_status[f"status{motor_index+1}"] = "ON"
+        manual_control[motor_index] = True
+        log_entry = f"Motor {motor_index+1} turned ON manually at {current_time}"
+    elif action == "off":
+        GPIO.output(MOTOR_PINS[motor_index], GPIO.LOW)
+        motor_status[f"status{motor_index+1}"] = "OFF"
+        manual_control[motor_index] = False
+        log_entry = f"Motor {motor_index+1} turned OFF manually at {current_time}"
+    else:
+        return jsonify({"error": "Invalid action"}), 400
+
+    history_log.append(log_entry)
+    print(log_entry)
+
+    return jsonify(motor_status)
+
+@app.route('/motor/status/<int:motor_id>', methods=['GET'])
+def get_motor_status(motor_id):
+    motor_id -= 1  # Adjust for zero-based indexing
+    if motor_id < 0 or motor_id >= len(MOTOR_PINS):
+        return jsonify({"error": "Invalid motor index"}), 400
+
+    status = motor_status.get(f"status{motor_id+1}", "UNKNOWN")
+    return jsonify({"status": status})
+
+@app.route('/historylog', methods=['GET'])
+def get_history_log():
+    return jsonify({"history": history_log})
+
+if __name__ == '__main__':
+    try:
+        app.run(host='0.0.0.0', port=5000)
+    finally:
+        stop_event.set()
+        sensor_thread.join()
+        scheduler_thread.join()
+        GPIO.cleanup()

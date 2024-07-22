@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Drip Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+        }
+        .channel-container {
+            display: none;
+        }
+        .channel-container.active {
+            display: block;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        #history, #schedules {
+            margin-top: 20px;
+            text-align: left;
+            margin-left: 25%;
+            margin-right: 25%;
+        }
+        .day-checkbox {
+            display: none;
+        }
+        .day-checkbox + label {
+            display: inline-block;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+<h1>Drip Controller</h1>
+
+<!-- Dropdown for selecting channels -->
+<label for="channelSelect">Select Channel:</label>
+<select id="channelSelect" onchange="selectChannel()">
+    <option value="1">Channel 1</option>
+    <option value="2">Channel 2</option>
+    <option value="3">Channel 3</option>
+    <option value="4">Channel 4</option>
+</select>
+
+<!-- Channel containers -->
+<div class="channel-container active" id="channel1">
+    <h3>Channel 1</h3>
+    <label for="startTime1">Start Time:</label>
+    <input type="time" id="startTime1" name="startTime1">
+    <br>
+    <label for="waterAmount1">Water Amount (Liters):</label>
+    <input type="number" id="waterAmount1" name="waterAmount1" min="1" step="1">
+    <br>
+    <input type="checkbox" id="allDays1" name="allDays1">
+    <label for="allDays1">All Days</label>
+    <br>
+    <input type="checkbox" id="alternateDays1" name="alternateDays1">
+    <label for="alternateDays1">Alternate Days</label>
+    <br>
+    <input type="checkbox" id="customDays1" name="customDays1">
+    <label for="customDays1">Custom Days</label>
+    <div id="customDaysContainer1">
+        <input type="checkbox" id="monday1" name="days1" value="Monday" class="day-checkbox">
+        <label for="monday1">Monday</label>
+        <input type="checkbox" id="tuesday1" name="days1" value="Tuesday" class="day-checkbox">
+        <label for="tuesday1">Tuesday</label>
+        <input type="checkbox" id="wednesday1" name="days1" value="Wednesday" class="day-checkbox">
+        <label for="wednesday1">Wednesday</label>
+        <input type="checkbox" id="thursday1" name="days1" value="Thursday" class="day-checkbox">
+        <label for="thursday1">Thursday</label>
+        <input type="checkbox" id="friday1" name="days1" value="Friday" class="day-checkbox">
+        <label for="friday1">Friday</label>
+        <input type="checkbox" id="saturday1" name="days1" value="Saturday" class="day-checkbox">
+        <label for="saturday1">Saturday</label>
+        <input type="checkbox" id="sunday1" name="days1" value="Sunday" class="day-checkbox">
+        <label for="sunday1">Sunday</label>
+    </div>
+    <br>
+    <button onclick="addSchedule(1)">Add Schedule</button>
+    <br>
+    <button onclick="controlMotor(1, 'on')">Turn Motor ON</button>
+    <button onclick="controlMotor(1, 'off')">Turn Motor OFF</button>
+    <br>
+    <div>Flow Sensor Rate: <span id="flowRate1"></span> L/min</div>
+    <br>
+    
+</div>
+
+<div class="channel-container" id="channel2">
+    <h3>Channel 2</h3>
+    <label for="startTime2">Start Time:</label>
+    <input type="time" id="startTime2" name="startTime2">
+    <br>
+    <label for="waterAmount2">Water Amount (Liters):</label>
+    <input type="number" id="waterAmount2" name="waterAmount2" min="1" step="1">
+    <br>
+    <input type="checkbox" id="allDays2" name="allDays2">
+    <label for="allDays2">All Days</label>
+    <br>
+    <input type="checkbox" id="alternateDays2" name="alternateDays2">
+    <label for="alternateDays2">Alternate Days</label>
+    <br>
+    <input type="checkbox" id="customDays2" name="customDays2">
+    <label for="customDays2">Custom Days</label>
+    <div id="customDaysContainer2">
+        <input type="checkbox" id="monday2" name="days2" value="Monday" class="day-checkbox">
+        <label for="monday2">Monday</label>
+        <input type="checkbox" id="tuesday2" name="days2" value="Tuesday" class="day-checkbox">
+        <label for="tuesday2">Tuesday</label>
+        <input type="checkbox" id="wednesday2" name="days2" value="Wednesday" class="day-checkbox">
+        <label for="wednesday2">Wednesday</label>
+        <input type="checkbox" id="thursday2" name="days2" value="Thursday" class="day-checkbox">
+        <label for="thursday2">Thursday</label>
+        <input type="checkbox" id="friday2" name="days2" value="Friday" class="day-checkbox">
+        <label for="friday2">Friday</label>
+        <input type="checkbox" id="saturday2" name="days2" value="Saturday" class="day-checkbox">
+        <label for="saturday2">Saturday</label>
+        <input type="checkbox" id="sunday2" name="days2" value="Sunday" class="day-checkbox">
+        <label for="sunday2">Sunday</label>
+    </div>
+    <br>
+    <button onclick="addSchedule(2)">Add Schedule</button>
+    <br>
+    <button onclick="controlMotor(2, 'on')">Turn Motor ON</button>
+    <button onclick="controlMotor(2, 'off')">Turn Motor OFF</button>
+    <br>
+    <div>Flow Sensor Rate: <span id="flowRate2"></span> L/min</div>
+    <br>
+    
+</div>
+
+<div class="channel-container" id="channel3">
+    <h3>Channel 3</h3>
+    <label for="startTime3">Start Time:</label>
+    <input type="time" id="startTime3" name="startTime3">
+    <br>
+    <label for="waterAmount3">Water Amount (Liters):</label>
+    <input type="number" id="waterAmount3" name="waterAmount3" min="1" step="1">
+    <br>
+    <input type="checkbox" id="allDays3" name="allDays3">
+    <label for="allDays3">All Days</label>
+    <br>
+    <input type="checkbox" id="alternateDays3" name="alternateDays3">
+    <label for="alternateDays3">Alternate Days</label>
+    <br>
+    <input type="checkbox" id="customDays3" name="customDays3">
+    <label for="customDays3">Custom Days</label>
+    <div id="customDaysContainer3">
+        <input type="checkbox" id="monday3" name="days3" value="Monday" class="day-checkbox">
+        <label for="monday3">Monday</label>
+        <input type="checkbox" id="tuesday3" name="days3" value="Tuesday" class="day-checkbox">
+        <label for="tuesday3">Tuesday</label>
+        <input type="checkbox" id="wednesday3" name="days3" value="Wednesday" class="day-checkbox">
+        <label for="wednesday3">Wednesday</label>
+        <input type="checkbox" id="thursday3" name="days3" value="Thursday" class="day-checkbox">
+        <label for="thursday3">Thursday</label>
+        <input type="checkbox" id="friday3" name="days3" value="Friday" class="day-checkbox">
+        <label for="friday3">Friday</label>
+        <input type="checkbox" id="saturday3" name="days3" value="Saturday" class="day-checkbox">
+        <label for="saturday3">Saturday</label>
+        <input type="checkbox" id="sunday3" name="days3" value="Sunday" class="day-checkbox">
+        <label for="sunday3">Sunday</label>
+    </div>
+    <br>
+    <button onclick="addSchedule(3)">Add Schedule</button>
+    <br>
+    <button onclick="controlMotor(3, 'on')">Turn Motor ON</button>
+    <button onclick="controlMotor(3, 'off')">Turn Motor OFF</button>
+    <br>
+    <div>Flow Sensor Rate: <span id="flowRate3"></span> L/min</div>
+    <br>
+   
+</div>
+
+<div class="channel-container" id="channel4">
+    <h3>Channel 4</h3>
+    <label for="startTime4">Start Time:</label>
+    <input type="time" id="startTime4" name="startTime4">
+    <br>
+    <label for="waterAmount4">Water Amount (Liters):</label>
+    <input type="number" id="waterAmount4" name="waterAmount4" min="1" step="1">
+    <br>
+    <input type="checkbox" id="allDays4" name="allDays4">
+    <label for="allDays4">All Days</label>
+    <br>
+    <input type="checkbox" id="alternateDays4" name="alternateDays4">
+    <label for="alternateDays4">Alternate Days</label>
+    <br>
+    <input type="checkbox" id="customDays4" name="customDays4">
+    <label for="customDays4">Custom Days</label>
+    <div id="customDaysContainer4">
+        <input type="checkbox" id="monday4" name="days4" value="Monday" class="day-checkbox">
+        <label for="monday4">Monday</label>
+        <input type="checkbox" id="tuesday4" name="days4" value="Tuesday" class="day-checkbox">
+        <label for="tuesday4">Tuesday</label>
+        <input type="checkbox" id="wednesday4" name="days4" value="Wednesday" class="day-checkbox">
+        <label for="wednesday4">Wednesday</label>
+        <input type="checkbox" id="thursday4" name="days4" value="Thursday" class="day-checkbox">
+        <label for="thursday4">Thursday</label>
+        <input type="checkbox" id="friday4" name="days4" value="Friday" class="day-checkbox">
+        <label for="friday4">Friday</label>
+        <input type="checkbox" id="saturday4" name="days4" value="Saturday" class="day-checkbox">
+        <label for="saturday4">Saturday</label>
+        <input type="checkbox" id="sunday4" name="days4" value="Sunday" class="day-checkbox">
+        <label for="sunday4">Sunday</label>
+    </div>
+    <br>
+    <button onclick="addSchedule(4)">Add Schedule</button>
+    <br>
+    <button onclick="controlMotor(4, 'on')">Turn Motor ON</button>
+    <button onclick="controlMotor(4, 'off')">Turn Motor OFF</button>
+    <br>
+    <div>Flow Sensor Rate: <span id="flowRate4"></span> L/min</div>
+    <br>
+    </div>
+    
+
+</div>
+
+
+ <h1>Motor Control System</h1>
+    <div>
+        <h2>Motor Status</h2>
+        <p>Motor 1: <span id="status1">{{ motorStatus.status1 }}</span></p>
+        <p>Motor 2: <span id="status2">{{ motorStatus.status2 }}</span></p>
+        <p>Motor 3: <span id="status3">{{ motorStatus.status3 }}</span></p>
+        <p>Motor 4: <span id="status4">{{ motorStatus.status4 }}</span></p>
+    </div>
+    <div>
+        <h3>Schedules:</h3>
+        <ul id="scheduleList1"></ul>
+        <ul id="scheduleList2"></ul>
+        <ul id="scheduleList3"></ul>
+        <ul id="scheduleList4"></ul>
+
+    </div>
+<div id="history">
+    <h3>History Log:</h3>
+    <ul id="historyLog">
+        <!-- History log entries will be populated dynamically -->
+    </ul>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+<script>
+const serverIp = '';
+
+var socket = io();
+
+socket.on('connect', function() {
+    console.log('Connected to server');
+});
+
+socket.on('disconnect', function() {
+    console.log('Disconnected from server');
+});
+
+socket.on('motor_status_update', function(data) {
+    console.log('Motor status update:', data);
+    var motorIndex = data.motor_index;
+    var status = data.status;
+
+    // Update UI based on motor status
+    var statusElement = document.getElementById('status' + motorIndex);
+    if (statusElement) {
+        statusElement.textContent = status;
+    }
+});
+
+function selectChannel() {
+    const selectedChannel = document.getElementById('channelSelect').value;
+    // Hide all channel containers
+    const allChannelContainers = document.querySelectorAll('.channel-container');
+    allChannelContainers.forEach(container => {
+        container.classList.remove('active');
+    });
+
+    // Show only the selected channel container
+    const selectedContainer = document.getElementById(`channel${selectedChannel}`);
+    if (selectedContainer) {
+        selectedContainer.classList.add('active');
+    }
+}
+
+function addSchedule(channel) {
+    const startTime = document.getElementById(`startTime${channel}`).value;
+    const waterAmount = document.getElementById(`waterAmount${channel}`).value;
+    let days = [];
+    const allDaysCheckbox = document.getElementById(`allDays${channel}`);
+    const alternateDaysCheckbox = document.getElementById(`alternateDays${channel}`);
+    const customDaysCheckbox = document.getElementById(`customDays${channel}`);
+
+    if (allDaysCheckbox.checked) {
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    } else if (alternateDaysCheckbox.checked) {
+        days = ['Monday', 'Wednesday', 'Friday', 'Sunday'];
+    } else if (customDaysCheckbox.checked) {
+        const checkboxes = document.querySelectorAll(`#channel${channel} .day-checkbox:checked`);
+        checkboxes.forEach(checkbox => {
+            days.push(checkbox.value);
+        });
+    }
+
+    if (days.length === 0) {
+        alert('Please select at least one day.');
+        return;
+    }
+
+    fetch(`${serverIp}/add_schedule?start=${startTime}&waterAmount=${waterAmount}&days=${days.join(',')}&channel=${channel}`)
+        .then(response => response.json())
+        .then(data => {
+            alert('Schedule added successfully.');
+            fetchSchedules(channel); // Refresh schedules for the specific channel after adding
+        })
+        .catch(error => {
+            console.error('Error adding schedule:', error);
+        });
+}
+
+
+function removeSchedule(channel, start, end) {
+    fetch(`${serverIp}/remove_schedule?start=${start}&end=${end}&channel=${channel}`)
+        .then(response => response.json())
+        .then(data => {
+            alert('Schedule removed successfully.');
+            fetchSchedules(channel);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+function fetchSchedules(channel) {
+    fetch(`${serverIp}/get_schedules?channel=${channel}`)
+        .then(response => response.json())
+        .then(data => {
+            const scheduleList = document.getElementById(`scheduleList${channel}`);
+            scheduleList.innerHTML = ''; // Clear the list before adding new items
+
+            const uniqueSchedules = new Set(); // Use a Set to store unique schedule strings
+
+            data.schedules.forEach(schedule => {
+                const startTime = schedule.start;
+                const endTime = schedule.end;
+                const waterAmount = schedule.waterAmount;
+                const days = schedule.days.join(', ');
+
+                // Create a unique identifier for each schedule entry
+                const scheduleString = `Channel ${channel}: ${startTime} - ${endTime} (${waterAmount} units) ${days}`;
+
+                // Only add to list if it's not a duplicate
+                if (!uniqueSchedules.has(scheduleString)) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `${scheduleString} <button onclick="removeSchedule(${channel}, '${startTime}', '${endTime}')">Remove</button>`;
+                    scheduleList.appendChild(li);
+                    uniqueSchedules.add(scheduleString); // Add to Set to track duplicates
+                }
+            });
+        })
+        .catch(error => console.error('Error fetching schedules:', error));
+}
+
+
+
+function controlMotor(channel, action) {
+    fetch(`${serverIp}/motor/${channel}/${action}`)
+        .then(response => response.json())
+        .then(data => {
+            
+            alert(`Motor ${channel} status: ${data.status}`);
+            updateStatus(channel);
+
+            addToHistoryLog(`Motor ${action.toUpperCase()}`, `Channel ${channel} - Status: ${status}`);
+            
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+function updateStatus(channel) {
+    fetch(`${serverIp}/motor/status/${channel}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById(`motorStatus${channel}`).innerText = data.status;
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function fetchFlowRate(channel) {
+    fetch(`${serverIp}/flow_rate/${channel}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById(`flowRate${channel}`).textContent = data.flowRate;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+function addToHistoryLog(action, details) {
+    const historyLog = document.getElementById('historyLog');
+    const li = document.createElement('li');
+    li.textContent = `${getCurrentTime()} - ${action}: ${details}`;
+    historyLog.prepend(li); // Add new entry at the beginning of the list
+}
+
+function getCurrentTime() {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+}
+
+// Fetch and update motor status, fetch schedules, and fetch flow rates remain unchanged
+
+// Example usage to add initial log entry
+addToHistoryLog('App Initialized', 'Drip Controller Application Initialized');
+
+// Fetch flow rate for all channels every 10 seconds
+setInterval(() => {
+    for (let i = 1; i <= 4; i++) {
+        fetchFlowRate(i);
+    }
+}, 10000);
+
+// Fetch schedules for all channels initially and every 60 seconds
+setInterval(() => {
+    for (let i = 1; i <= 4; i++) {
+        fetchSchedules(i);
+    }
+}, 60000);
+
+// Update motor status for all channels every 5 seconds
+setInterval(() => {
+    for (let i = 1; i <= 4; i++) {
+        updateStatus(i);
+    }
+}, 5000);
+
+
+</script>
+</body>
+</html>
