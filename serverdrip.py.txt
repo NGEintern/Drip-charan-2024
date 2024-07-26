@@ -7,6 +7,10 @@ import RPi.GPIO as GPIO
 
 app = Flask(__name__)
 socketio = SocketIO(app)
+last_heartbeat = None
+onStat = False
+
+
 
 schedules = {1: [], 2: [], 3: [], 4: []}
 
@@ -20,7 +24,7 @@ FLOW_SENSOR_DATA = {
 
 # GPIO setup
 MOTOR_PINS = [2, 3, 4, 5]
-FLOW_SENSOR_PINS = [6, 7, 8, 9]
+FLOW_SENSOR_PINS = [27, 26, 25, 14]
 GPIO.setmode(GPIO.BCM)
 for pin in MOTOR_PINS:
     GPIO.setup(pin, GPIO.OUT)
@@ -47,6 +51,17 @@ manual_control = [False, False, False, False]  # Track manual control for each m
 def read_sensors():
     global esp_connected, FLOW_SENSOR_DATA
     while not stop_event.is_set():
+        global last_heartbeat
+        global onStat
+        status = "Inactive"
+        if last_heartbeat:
+            if datetime.now() - last_heartbeat < timedelta(seconds=15):
+                onStat = True
+                status = "Active"
+                print("active")
+            elif datetime.now() - last_heartbeat >= timedelta(seconds=15):
+                onStat = False
+                print("inactive")
         if esp_connected:
             for i, pin in enumerate(FLOW_SENSOR_PINS):
                 # Read the sensor data and update FLOW_SENSOR_DATA
@@ -112,6 +127,13 @@ def schedule_motor():
 scheduler_thread = Thread(target=schedule_motor)
 scheduler_thread.start()
 
+@app.route('/heartbeat', methods=['GET'])
+def heartbeat():
+    global last_heartbeat
+    last_heartbeat = datetime.now()
+    return 'OK', 200
+
+
 @socketio.on('connect')
 def handle_connect():
     emit('server_status', {'status': 'connected'})
@@ -159,13 +181,20 @@ def add_schedule():
         days = request.args.get('days').split(',')
         motor_index = int(request.args.get('channel')) - 1
 
+        # Validate parameters
         if not start_time or not days or motor_index < 0:
             return jsonify({"message": "Invalid parameters"}), 400
 
-        flow_rate = FLOW_SENSOR_DATA[f"flowRate{motor_index + 1}"]
+        # Check for valid flow rate
+        flow_rate = FLOW_SENSOR_DATA.get(f"flowRate{motor_index + 1}", 0.0)
+        if flow_rate <= 0:
+            return jsonify({"message": "Invalid flow rate"}), 400
+
+        # Calculate duration and end time
         duration = calculate_duration(water_amount, flow_rate)
         end_time = calculate_end_time(start_time, duration)
 
+        # Create new schedule
         new_schedule = {
             "start": start_time,
             "end": end_time,
@@ -186,6 +215,7 @@ def add_schedule():
         return jsonify({"message": f"Invalid input: {e}"}), 400
     except Exception as e:
         return jsonify({"message": f"An error occurred: {e}"}), 500
+
 
 def calculate_duration(water_amount, flow_rate):
     if flow_rate <= 0:
